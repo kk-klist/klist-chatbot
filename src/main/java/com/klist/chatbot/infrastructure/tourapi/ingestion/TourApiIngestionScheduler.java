@@ -14,6 +14,7 @@ public class TourApiIngestionScheduler {
 
     private final TourApiIngestionService ingestionService;
     private final TourApiIngestionProperties ingestionProperties;
+    private final TourApiIngestionLock distributedLock;
     private final AtomicBoolean running = new AtomicBoolean();
     private final AtomicReference<TourApiIngestionExecution> lastExecution = new AtomicReference<>();
 
@@ -21,8 +22,17 @@ public class TourApiIngestionScheduler {
             TourApiIngestionService ingestionService,
             TourApiIngestionProperties ingestionProperties
     ) {
+        this(ingestionService, ingestionProperties, TourApiIngestionLock.LOCAL_ONLY);
+    }
+
+    public TourApiIngestionScheduler(
+            TourApiIngestionService ingestionService,
+            TourApiIngestionProperties ingestionProperties,
+            TourApiIngestionLock distributedLock
+    ) {
         this.ingestionService = ingestionService;
         this.ingestionProperties = ingestionProperties;
+        this.distributedLock = distributedLock;
     }
 
     @Scheduled(
@@ -35,8 +45,15 @@ public class TourApiIngestionScheduler {
             return;
         }
 
+        Optional<TourApiIngestionLock.Lease> lease = distributedLock.tryAcquire();
+        if (lease.isEmpty()) {
+            running.set(false);
+            log.warn("Scheduled TourAPI ingestion skipped because the distributed lock is unavailable.");
+            return;
+        }
+
         Instant startedAt = Instant.now();
-        try {
+        try (TourApiIngestionLock.Lease ignored = lease.orElseThrow()) {
             log.info("Scheduled TourAPI ingestion started.");
             TourApiIngestionSummary summary = ingestionService.ingestAll(
                     ingestionProperties.getPageSize(),

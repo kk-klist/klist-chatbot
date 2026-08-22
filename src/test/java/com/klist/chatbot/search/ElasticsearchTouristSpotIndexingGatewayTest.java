@@ -96,6 +96,23 @@ class ElasticsearchTouristSpotIndexingGatewayTest {
     }
 
     @Test
+    void findsDocumentByIdFromAlias() {
+        TouristSpotSearchDocument document = document(1L, "경복궁");
+        when(operations.get(
+                eq("1"),
+                eq(TouristSpotSearchDocument.class),
+                any(IndexCoordinates.class)
+        )).thenReturn(document);
+
+        assertThat(gateway.findById(1L)).contains(document);
+    }
+
+    @Test
+    void returnsEmptyWhenDocumentDoesNotExist() {
+        assertThat(gateway.findById(404L)).isEmpty();
+    }
+
+    @Test
     void convertsElasticsearchFailureToApplicationException() {
         when(operations.exists(eq("1"), any(IndexCoordinates.class)))
                 .thenThrow(new IllegalStateException("secret cluster details"));

@@ -2,6 +2,7 @@ package com.klist.chatbot.infrastructure.search.index;
 
 import com.klist.chatbot.infrastructure.search.document.TouristSpotSearchDocument;
 import java.util.List;
+import java.util.Optional;
 
 public interface TouristSpotIndexingGateway {
 
@@ -17,4 +18,6 @@ public interface TouristSpotIndexingGateway {
     void delete(Long touristSpotId);
 
     boolean exists(Long touristSpotId);
+
+    Optional<TouristSpotSearchDocument> findById(Long touristSpotId);
 }

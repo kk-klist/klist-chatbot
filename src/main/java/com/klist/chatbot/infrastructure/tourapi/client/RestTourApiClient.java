@@ -95,14 +95,7 @@ public class RestTourApiClient implements TourApiClient {
             return invalidInput("contentId is required");
         }
         return get("detailCommon2", TourApiDetailCommonItem.class,
-                builder -> builder.queryParam("contentId", contentId)
-                        .queryParam("defaultYN", "Y")
-                        .queryParam("firstImageYN", "Y")
-                        .queryParam("areacodeYN", "Y")
-                        .queryParam("catcodeYN", "Y")
-                        .queryParam("addrinfoYN", "Y")
-                        .queryParam("mapinfoYN", "Y")
-                        .queryParam("overviewYN", "Y"), item -> true);
+                builder -> builder.queryParam("contentId", contentId), item -> true);
     }
 
     @Override

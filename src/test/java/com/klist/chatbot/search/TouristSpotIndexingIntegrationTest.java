@@ -2,6 +2,8 @@ package com.klist.chatbot.search;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.klist.chatbot.chat.application.ChatSearchOrchestrator;
+import com.klist.chatbot.chat.application.prompt.ChatPromptPreparationStatus;
 import com.klist.chatbot.infrastructure.search.document.TouristSpotSearchDocument;
 import com.klist.chatbot.infrastructure.search.document.TouristSpotSearchCategory;
 import com.klist.chatbot.infrastructure.search.document.TouristSpotSearchRegion;
@@ -12,6 +14,10 @@ import com.klist.chatbot.search.application.TouristSpotSearchCriteria;
 import com.klist.chatbot.search.application.TouristSpotSearchGateway;
 import com.klist.chatbot.search.application.TouristSpotSearchResult;
 import com.klist.chatbot.search.fixture.TouristSpotSearchQualityFixture;
+import com.klist.chatbot.search.fixture.TourApiSampleSearchQualityFixture;
+import com.klist.chatbot.search.fixture.TouristSpotSearchQualityEvaluator;
+import com.klist.chatbot.search.fixture.SearchQualityCase;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
@@ -61,6 +67,9 @@ class TouristSpotIndexingIntegrationTest {
 
     @Autowired
     private TouristSpotSearchGateway searchGateway;
+
+    @Autowired
+    private ChatSearchOrchestrator chatSearchOrchestrator;
 
     @Autowired
     private ElasticsearchOperations operations;
@@ -174,6 +183,62 @@ class TouristSpotIndexingIntegrationTest {
                 }
             }
         });
+    }
+
+    @Test
+    void reportsTopOneAndTopThreeQualityByRegionAndContentTypeUsingTourApiSamples() {
+        var tourApiSamples = TourApiSampleSearchQualityFixture.load();
+        List<TouristSpotSearchDocument> documents = new ArrayList<>(TouristSpotSearchQualityFixture.documents());
+        documents.addAll(tourApiSamples.documents());
+        gateway.saveAll(documents);
+        operations.indexOps(IndexCoordinates.of("tourist-spots-v1")).refresh();
+
+        List<SearchQualityCase> cases = new ArrayList<>(TouristSpotSearchQualityFixture.cases());
+        cases.addAll(tourApiSamples.cases());
+        var evaluation = TouristSpotSearchQualityEvaluator.evaluate(cases, searchGateway);
+
+        assertThat(evaluation.overall().total()).isEqualTo(14);
+        assertThat(evaluation.overall().top1Rate()).isGreaterThanOrEqualTo(0.9);
+        assertThat(evaluation.overall().top3Rate()).isEqualTo(1.0);
+        assertThat(evaluation.byRegion()).containsKeys("서울", "부산", "제주");
+        assertThat(evaluation.byRegion().values())
+                .allSatisfy(metrics -> assertThat(metrics.top3Rate()).isEqualTo(1.0));
+        assertThat(evaluation.byContentType()).containsKeys("12", "14", "15", "25", "28", "32", "38", "39");
+        assertThat(evaluation.byContentType().values())
+                .allSatisfy(metrics -> assertThat(metrics.top3Rate()).isEqualTo(1.0));
+    }
+
+    @Test
+    void analyzesChatQuestionsIntoCriteriaThatRetrieveExpectedTouristSpots() {
+        gateway.saveAll(TouristSpotSearchQualityFixture.documents());
+        operations.indexOps(IndexCoordinates.of("tourist-spots-v1")).refresh();
+
+        assertAnalyzedTopOne("서울에서 야경 전망 명소 추천해줘",
+                TouristSpotSearchQualityFixture.N_SEOUL_TOWER_ID);
+        assertAnalyzedTopOne("부산에서 해변 데이트 명소 알려줘",
+                TouristSpotSearchQualityFixture.HAEUNDAE_ID);
+        assertAnalyzedTopOne("서울에서 비 오는 날 실내 미술관 찾아줘",
+                TouristSpotSearchQualityFixture.SEOUL_MUSEUM_ID);
+    }
+
+    private void assertAnalyzedTopOne(String question, long expectedTouristSpotId) {
+        var chatSearchResult = chatSearchOrchestrator.search(question);
+        var analysis = chatSearchResult.questionAnalysis();
+        TouristSpotSearchResult result = chatSearchResult.touristSpotSearchResult();
+
+        assertThat(chatSearchResult.promptPreparation().status())
+                .isEqualTo(ChatPromptPreparationStatus.READY);
+        assertThat(chatSearchResult.promptPreparation().prompt().userMessage())
+                .contains(question, "\"touristSpotId\":" + expectedTouristSpotId);
+        assertThat(chatSearchResult.evidenceContext().touristSpots())
+                .extracting(evidence -> evidence.touristSpotId())
+                .containsExactlyElementsOf(result.evidence().stream()
+                        .map(evidence -> evidence.touristSpotId())
+                        .toList());
+        assertThat(result.evidence())
+                .as("question=%s keyword=%s", question, analysis.normalizedKeyword())
+                .isNotEmpty();
+        assertThat(result.evidence().get(0).touristSpotId()).isEqualTo(expectedTouristSpotId);
     }
 
     private static TouristSpotSearchDocument document(Long id, String title) {

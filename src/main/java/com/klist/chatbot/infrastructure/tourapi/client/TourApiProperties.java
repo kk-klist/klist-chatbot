@@ -13,6 +13,10 @@ public class TourApiProperties {
     private String responseType = "json";
     private Duration connectTimeout = Duration.ofSeconds(3);
     private Duration responseTimeout = Duration.ofSeconds(5);
+    private Duration requestInterval = Duration.ofMillis(100);
+    private int retryMaxAttempts = 3;
+    private Duration retryInitialBackoff = Duration.ofMillis(200);
+    private Duration retryMaxBackoff = Duration.ofSeconds(2);
 
     public String getBaseUrl() {
         return baseUrl;
@@ -68,5 +72,37 @@ public class TourApiProperties {
 
     public void setResponseTimeout(Duration responseTimeout) {
         this.responseTimeout = responseTimeout;
+    }
+
+    public Duration getRequestInterval() {
+        return requestInterval;
+    }
+
+    public void setRequestInterval(Duration requestInterval) {
+        this.requestInterval = requestInterval;
+    }
+
+    public int getRetryMaxAttempts() {
+        return retryMaxAttempts;
+    }
+
+    public void setRetryMaxAttempts(int retryMaxAttempts) {
+        this.retryMaxAttempts = retryMaxAttempts;
+    }
+
+    public Duration getRetryInitialBackoff() {
+        return retryInitialBackoff;
+    }
+
+    public void setRetryInitialBackoff(Duration retryInitialBackoff) {
+        this.retryInitialBackoff = retryInitialBackoff;
+    }
+
+    public Duration getRetryMaxBackoff() {
+        return retryMaxBackoff;
+    }
+
+    public void setRetryMaxBackoff(Duration retryMaxBackoff) {
+        this.retryMaxBackoff = retryMaxBackoff;
     }
 }

@@ -1,5 +1,6 @@
 package com.klist.chatbot.chat.presentation;
 
+import jakarta.servlet.http.HttpServletRequest;
 import java.util.UUID;
 
 final class TraceIdResolver {
@@ -16,5 +17,15 @@ final class TraceIdResolver {
             return UUID.randomUUID().toString();
         }
         return candidate;
+    }
+
+    static String resolve(HttpServletRequest request) {
+        Object attribute = request.getAttribute(REQUEST_ATTRIBUTE);
+        if (attribute instanceof String traceId && !traceId.isBlank()) {
+            return traceId;
+        }
+        String traceId = resolve(request.getHeader(HEADER_NAME));
+        request.setAttribute(REQUEST_ATTRIBUTE, traceId);
+        return traceId;
     }
 }

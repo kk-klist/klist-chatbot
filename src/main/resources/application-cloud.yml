@@ -13,6 +13,9 @@ spring:
     password: ${ELASTICSEARCH_PASSWORD}
     connection-timeout: ${ELASTICSEARCH_CONNECTION_TIMEOUT:3s}
     socket-timeout: ${ELASTICSEARCH_SOCKET_TIMEOUT:10s}
+  data:
+    redis:
+      url: ${REDIS_URL}
   flyway:
     enabled: true
     locations: classpath:db/migration
@@ -34,6 +37,14 @@ server:
   shutdown: graceful
   forward-headers-strategy: framework
 
+logging:
+  structured:
+    format:
+      console: ${LOGGING_STRUCTURED_FORMAT_CONSOLE:logstash}
+    json:
+      context:
+        include: true
+
 tour-api:
   service-key: ${TOUR_API_SERVICE_KEY:}
   ingestion:
@@ -45,6 +56,8 @@ tour-api:
       enabled: ${TOUR_API_INGESTION_SCHEDULE_ENABLED:false}
       cron: ${TOUR_API_INGESTION_SCHEDULE_CRON:0 0 3 * * *}
       zone: ${TOUR_API_INGESTION_SCHEDULE_ZONE:Asia/Seoul}
+      lock-key: ${TOUR_API_INGESTION_LOCK_KEY:klist:tourapi:ingestion:schedule}
+      lock-ttl: ${TOUR_API_INGESTION_LOCK_TTL:2h}
 
 search:
   tourist-spots:
@@ -54,3 +67,7 @@ search:
       mode: ${TOURIST_SPOT_INDEX_BOOTSTRAP_MODE:none}
     reindex:
       page-size: ${TOURIST_SPOT_REINDEX_PAGE_SIZE:500}
+    cache:
+      enabled: ${TOURIST_SPOT_SEARCH_CACHE_ENABLED:true}
+      ttl: ${TOURIST_SPOT_SEARCH_CACHE_TTL:5m}
+      key-prefix: ${TOURIST_SPOT_SEARCH_CACHE_KEY_PREFIX:klist:search:tourist-spots:}

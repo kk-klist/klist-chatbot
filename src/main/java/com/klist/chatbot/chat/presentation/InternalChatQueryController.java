@@ -8,7 +8,6 @@ import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -24,12 +23,10 @@ public class InternalChatQueryController {
 
     @PostMapping("/query")
     public ResponseEntity<InternalChatQueryResponse> query(
-            @RequestHeader(name = TraceIdResolver.HEADER_NAME, required = false) String requestedTraceId,
             @Valid @RequestBody InternalChatQueryRequest request,
             HttpServletRequest servletRequest
     ) {
-        String traceId = TraceIdResolver.resolve(requestedTraceId);
-        servletRequest.setAttribute(TraceIdResolver.REQUEST_ATTRIBUTE, traceId);
+        String traceId = TraceIdResolver.resolve(servletRequest);
         InternalChatQueryResponse response = chatQueryUseCase.query(request, traceId);
         return ResponseEntity.ok()
                 .header(TraceIdResolver.HEADER_NAME, traceId)

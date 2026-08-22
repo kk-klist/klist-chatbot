@@ -2,6 +2,7 @@ package com.klist.chatbot.infrastructure.search.index;
 
 import com.klist.chatbot.infrastructure.search.document.TouristSpotSearchDocument;
 import java.util.List;
+import java.util.Optional;
 import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
 import org.springframework.data.elasticsearch.core.mapping.IndexCoordinates;
 import org.springframework.data.elasticsearch.core.query.IndexQuery;
@@ -93,6 +94,24 @@ public class ElasticsearchTouristSpotIndexingGateway implements TouristSpotIndex
             throw failure(
                     TouristSpotIndexOperation.EXISTS,
                     "Unable to check a tourist spot search document.",
+                    exception
+            );
+        }
+    }
+
+    @Override
+    public Optional<TouristSpotSearchDocument> findById(Long touristSpotId) {
+        validateId(touristSpotId);
+        try {
+            return Optional.ofNullable(operations.get(
+                    touristSpotId.toString(),
+                    TouristSpotSearchDocument.class,
+                    indexCoordinates
+            ));
+        } catch (RuntimeException exception) {
+            throw failure(
+                    TouristSpotIndexOperation.GET,
+                    "Unable to get a tourist spot search document.",
                     exception
             );
         }

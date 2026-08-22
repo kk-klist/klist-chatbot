@@ -6,5 +6,6 @@ public enum TouristSpotIndexOperation {
     SAVE,
     BULK_SAVE,
     DELETE,
-    EXISTS
+    EXISTS,
+    GET
 }

@@ -3,6 +3,7 @@ package com.klist.chatbot.infrastructure.search.document;
 import java.time.LocalDateTime;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.elasticsearch.annotations.Document;
+import org.springframework.data.elasticsearch.annotations.DateFormat;
 import org.springframework.data.elasticsearch.annotations.Field;
 import org.springframework.data.elasticsearch.annotations.FieldType;
 import org.springframework.data.elasticsearch.annotations.InnerField;
@@ -63,7 +64,7 @@ public record TouristSpotSearchDocument(
         @Field(type = FieldType.Keyword, index = false)
         String reservationUrl,
 
-        @Field(type = FieldType.Date)
+        @Field(type = FieldType.Date, format = DateFormat.date_hour_minute_second)
         LocalDateTime sourceModifiedAt
 ) {
 }

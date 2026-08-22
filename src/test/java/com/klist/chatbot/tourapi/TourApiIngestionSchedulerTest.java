@@ -2,15 +2,19 @@ package com.klist.chatbot.tourapi;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.klist.chatbot.domain.touristspot.service.result.TouristSpotImportSummary;
+import com.klist.chatbot.infrastructure.tourapi.ingestion.TourApiIngestionLock;
 import com.klist.chatbot.infrastructure.tourapi.ingestion.TourApiIngestionProperties;
 import com.klist.chatbot.infrastructure.tourapi.ingestion.TourApiIngestionScheduler;
 import com.klist.chatbot.infrastructure.tourapi.ingestion.TourApiIngestionService;
 import com.klist.chatbot.infrastructure.tourapi.ingestion.TourApiIngestionSummary;
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -76,6 +80,36 @@ class TourApiIngestionSchedulerTest {
                     assertThat(execution.isSuccess()).isFalse();
                     assertThat(execution.failure()).contains("IllegalStateException");
                 });
+    }
+
+    @Test
+    void skipsExecutionWhenDistributedLockIsHeld() {
+        TourApiIngestionService service = mock(TourApiIngestionService.class);
+        TourApiIngestionLock lock = () -> Optional.empty();
+        TourApiIngestionScheduler scheduler = new TourApiIngestionScheduler(
+                service, properties(), lock
+        );
+
+        scheduler.runScheduledIngestion();
+
+        verify(service, never()).ingestAll(50, 2, 20);
+        assertThat(scheduler.isRunning()).isFalse();
+        assertThat(scheduler.lastExecution()).isEmpty();
+    }
+
+    @Test
+    void releasesDistributedLockAfterExecution() {
+        TourApiIngestionService service = mock(TourApiIngestionService.class);
+        when(service.ingestAll(50, 2, 20)).thenReturn(summary());
+        TourApiIngestionLock.Lease lease = mock(TourApiIngestionLock.Lease.class);
+        TourApiIngestionLock lock = () -> Optional.of(lease);
+        TourApiIngestionScheduler scheduler = new TourApiIngestionScheduler(
+                service, properties(), lock
+        );
+
+        scheduler.runScheduledIngestion();
+
+        verify(lease).close();
     }
 
     private static TourApiIngestionProperties properties() {

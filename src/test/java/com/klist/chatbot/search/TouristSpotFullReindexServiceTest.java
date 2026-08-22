@@ -14,6 +14,8 @@ import com.klist.chatbot.infrastructure.search.index.TouristSpotIndexManager;
 import com.klist.chatbot.infrastructure.search.index.TouristSpotIndexingException;
 import com.klist.chatbot.infrastructure.search.index.TouristSpotIndexingGateway;
 import com.klist.chatbot.infrastructure.search.mapper.TouristSpotSearchDocumentMapper;
+import com.klist.chatbot.infrastructure.search.failure.TouristSpotIndexFailureOperation;
+import com.klist.chatbot.infrastructure.search.failure.TouristSpotIndexFailureRecorder;
 import com.klist.chatbot.search.application.TouristSpotFullReindexService;
 import com.klist.chatbot.search.application.TouristSpotReindexProperties;
 import com.klist.chatbot.search.application.TouristSpotReindexStatus;
@@ -33,6 +35,9 @@ class TouristSpotFullReindexServiceTest {
     private final TouristSpotSearchDocumentMapper mapper = mock(TouristSpotSearchDocumentMapper.class);
     private final TouristSpotIndexingGateway gateway = mock(TouristSpotIndexingGateway.class);
     private final TouristSpotIndexManager indexManager = mock(TouristSpotIndexManager.class);
+    private final TouristSpotIndexFailureRecorder failureRecorder = mock(
+            TouristSpotIndexFailureRecorder.class
+    );
     private final TouristSpotReindexProperties properties = new TouristSpotReindexProperties();
     private TouristSpotFullReindexService service;
 
@@ -48,7 +53,8 @@ class TouristSpotFullReindexServiceTest {
                 new AdvancingClock(
                         Instant.parse("2026-07-28T10:00:00Z"),
                         Instant.parse("2026-07-28T10:00:03Z")
-                )
+                ),
+                failureRecorder
         );
         when(indexManager.createNewVersionIndex()).thenReturn("tourist-spots-v2");
     }
@@ -103,6 +109,18 @@ class TouristSpotFullReindexServiceTest {
         assertThat(summary.failedTouristSpotIds()).containsExactly(1L, 2L);
         assertThat(summary.aliasSwitched()).isFalse();
         verify(indexManager, never()).switchAlias("tourist-spots-v2");
+        verify(failureRecorder).record(
+                org.mockito.ArgumentMatchers.eq(1L),
+                org.mockito.ArgumentMatchers.eq(TouristSpotIndexFailureOperation.FULL_REINDEX),
+                org.mockito.ArgumentMatchers.eq("tourist-spots-v2"),
+                org.mockito.ArgumentMatchers.any(RuntimeException.class)
+        );
+        verify(failureRecorder).record(
+                org.mockito.ArgumentMatchers.eq(2L),
+                org.mockito.ArgumentMatchers.eq(TouristSpotIndexFailureOperation.FULL_REINDEX),
+                org.mockito.ArgumentMatchers.eq("tourist-spots-v2"),
+                org.mockito.ArgumentMatchers.any(RuntimeException.class)
+        );
     }
 
     @Test
@@ -123,6 +141,12 @@ class TouristSpotFullReindexServiceTest {
         assertThat(summary.failureCount()).isOne();
         assertThat(summary.failedTouristSpotIds()).containsExactly(1L);
         verify(indexManager, never()).switchAlias("tourist-spots-v2");
+        verify(failureRecorder).record(
+                org.mockito.ArgumentMatchers.eq(1L),
+                org.mockito.ArgumentMatchers.eq(TouristSpotIndexFailureOperation.FULL_REINDEX),
+                org.mockito.ArgumentMatchers.eq("tourist-spots-v2"),
+                org.mockito.ArgumentMatchers.any(IllegalArgumentException.class)
+        );
     }
 
     private static TouristSpot entity(long id) {

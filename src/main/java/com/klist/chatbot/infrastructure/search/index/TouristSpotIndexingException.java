@@ -1,6 +1,11 @@
 package com.klist.chatbot.infrastructure.search.index;
 
-public class TouristSpotIndexingException extends RuntimeException {
+import com.klist.chatbot.global.error.ChatbotErrorComponent;
+import com.klist.chatbot.global.error.ChatbotErrorType;
+import com.klist.chatbot.global.error.ChatbotException;
+import java.util.Objects;
+
+public class TouristSpotIndexingException extends ChatbotException {
 
     private final TouristSpotIndexOperation operation;
 
@@ -9,8 +14,9 @@ public class TouristSpotIndexingException extends RuntimeException {
             String message,
             Throwable cause
     ) {
-        super(message, cause);
-        this.operation = operation;
+        super(ChatbotErrorComponent.INDEX, ChatbotErrorType.INDEX_FAILURE,
+                message, true, cause);
+        this.operation = Objects.requireNonNull(operation, "operation must not be null");
     }
 
     public TouristSpotIndexOperation operation() {

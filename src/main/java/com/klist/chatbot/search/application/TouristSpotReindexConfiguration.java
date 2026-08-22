@@ -4,6 +4,7 @@ import com.klist.chatbot.domain.touristspot.repository.TouristSpotRepository;
 import com.klist.chatbot.infrastructure.search.index.TouristSpotIndexManager;
 import com.klist.chatbot.infrastructure.search.index.TouristSpotIndexingGateway;
 import com.klist.chatbot.infrastructure.search.mapper.TouristSpotSearchDocumentMapper;
+import com.klist.chatbot.infrastructure.search.failure.TouristSpotIndexFailureRecorder;
 import java.time.Clock;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
@@ -22,7 +23,8 @@ public class TouristSpotReindexConfiguration {
             TouristSpotSearchDocumentMapper mapper,
             TouristSpotIndexingGateway indexingGateway,
             TouristSpotIndexManager indexManager,
-            TouristSpotReindexProperties properties
+            TouristSpotReindexProperties properties,
+            TouristSpotIndexFailureRecorder failureRecorder
     ) {
         return new TouristSpotFullReindexService(
                 repository,
@@ -30,7 +32,8 @@ public class TouristSpotReindexConfiguration {
                 indexingGateway,
                 indexManager,
                 properties,
-                Clock.systemUTC()
+                Clock.systemUTC(),
+                failureRecorder
         );
     }
 

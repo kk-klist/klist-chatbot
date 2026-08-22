@@ -11,6 +11,9 @@ import com.klist.chatbot.infrastructure.search.document.TouristSpotSearchDocumen
 import com.klist.chatbot.infrastructure.search.index.TouristSpotIndexingException;
 import com.klist.chatbot.infrastructure.search.index.TouristSpotIndexingGateway;
 import com.klist.chatbot.infrastructure.search.index.TouristSpotIndexOperation;
+import com.klist.chatbot.infrastructure.search.index.TouristSpotIndexProperties;
+import com.klist.chatbot.infrastructure.search.failure.TouristSpotIndexFailureOperation;
+import com.klist.chatbot.infrastructure.search.failure.TouristSpotIndexFailureRecorder;
 import com.klist.chatbot.infrastructure.search.mapper.TouristSpotSearchDocumentMapper;
 import com.klist.chatbot.infrastructure.search.sync.TouristSpotIndexSyncResult;
 import com.klist.chatbot.infrastructure.search.sync.TouristSpotIndexSyncService;
@@ -64,6 +67,34 @@ class TouristSpotIndexSyncServiceTest {
 
         assertThat(result.status()).isEqualTo(TouristSpotIndexSyncStatus.FAILED);
         assertThat(result.failureMessage()).contains("Elasticsearch unavailable");
+    }
+
+    @Test
+    void persistsIncrementalIndexFailureForLaterRetry() {
+        TouristSpot touristSpot = touristSpot(101L);
+        TouristSpotIndexFailureRecorder recorder = mock(TouristSpotIndexFailureRecorder.class);
+        TouristSpotIndexProperties properties = new TouristSpotIndexProperties();
+        properties.setAlias("tourist-spots");
+        TouristSpotIndexSyncService recordingService = new TouristSpotIndexSyncService(
+                repository, mapper, indexingGateway, recorder, properties
+        );
+        TouristSpotIndexingException failure = new TouristSpotIndexingException(
+                TouristSpotIndexOperation.SAVE,
+                "Elasticsearch unavailable",
+                new RuntimeException("connection refused")
+        );
+        when(repository.findById(101L)).thenReturn(Optional.of(touristSpot));
+        when(indexingGateway.save(org.mockito.ArgumentMatchers.any(TouristSpotSearchDocument.class)))
+                .thenThrow(failure);
+
+        recordingService.synchronize(101L);
+
+        verify(recorder).record(
+                101L,
+                TouristSpotIndexFailureOperation.INCREMENTAL,
+                "tourist-spots",
+                failure
+        );
     }
 
     private static TouristSpot touristSpot(Long id) {

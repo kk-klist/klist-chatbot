@@ -46,3 +46,7 @@ docs
 !src/docs/
 src/docs/*
 !src/docs/10_TourAPI_Collector_Architecture.md
+!src/docs/14_TourAPI_50_Validation_Report.md
+!src/docs/15_Backend_Chatbot_Connection_Validation.md
+!src/docs/16_Resilience_Validation_Report.md
+!src/docs/17_STT_Architecture.md

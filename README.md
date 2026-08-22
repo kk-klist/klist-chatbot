@@ -20,7 +20,23 @@ DB_PASSWORD=<database-password>
 ELASTICSEARCH_URIS=https://<elasticsearch-endpoint>
 ELASTICSEARCH_USERNAME=<elasticsearch-user>
 ELASTICSEARCH_PASSWORD=<elasticsearch-password>
+
+INTERNAL_API_KEY=<256-bit-random-secret>
+
+STT_OPENAI_ENABLED=true
+STT_OPENAI_API_KEY=<openai-api-key>
 ```
+
+Backend는 모든 `/internal/**` 요청에 `X-Internal-Api-Key` 헤더로 같은 값을 전달해야 한다.
+키는 소스나 이미지에 포함하지 않고 배포 환경의 Secret Manager에서 환경변수로 주입한다.
+
+음성 질문은 `POST /internal/chat/query/audio`의 multipart `request` JSON과 `audio` 파일로 전달한다.
+지원 형식은 mp3, mp4, mpeg, mpga, m4a, wav, webm이며 최대 크기는 25MB다. 음성 파일은
+DB나 파일 시스템에 저장하지 않고 STT 결과 텍스트만 기존 Chat 처리 흐름에 전달한다.
+
+내부 Chat 요청은 UUID `requestId`를 필수로 사용한다. 완료 응답과 처리 잠금은 Redis에 5분간
+보관하며 Redis 장애 시 중복 LLM 호출을 막기 위해 `503`으로 fail-closed 처리한다. Backend는 최대
+10개의 임시 대화 문맥을 전달하고, 답변 완료 후 자체 Redis 세션 TTL을 3분으로 갱신한다.
 
 TourAPI 수집 또는 Scheduler를 사용할 때 추가하는 환경변수:
 
@@ -47,6 +63,20 @@ TOURIST_SPOT_INDEX_BOOTSTRAP_MODE=initialize
 TOURIST_SPOT_INDEX_BOOTSTRAP_MODE=reindex
 TOURIST_SPOT_INDEX_VERSION=v2
 ```
+
+색인 실패 재처리 Scheduler는 기본적으로 비활성화되어 있다. 운영 환경에서 다음 설정으로 활성화한다.
+
+```text
+TOURIST_SPOT_INDEX_FAILURE_RETRY_ENABLED=true
+TOURIST_SPOT_INDEX_FAILURE_RETRY_INTERVAL=30s
+TOURIST_SPOT_INDEX_FAILURE_RETRY_BATCH_SIZE=20
+TOURIST_SPOT_INDEX_FAILURE_RETRY_MAX_ATTEMPTS=5
+TOURIST_SPOT_INDEX_FAILURE_RETRY_INITIAL_BACKOFF=30s
+TOURIST_SPOT_INDEX_FAILURE_RETRY_MAX_BACKOFF=30m
+```
+
+단건·전체 색인 실패는 `tourist_spot_index_failure`에 기록된다. Elasticsearch 일시 장애만 재처리하며,
+매핑 오류와 원본 삭제, 최대 재시도 소진 건은 `EXHAUSTED` 상태로 격리한다.
 
 `reindex`에는 아직 존재하지 않는 새 버전을 지정해야 한다. 문서 변환이나 색인이 하나라도 실패하면
 Alias를 전환하지 않고 애플리케이션 시작을 실패시킨다. 초기 배포는 `initialize`, 데이터가 존재하는

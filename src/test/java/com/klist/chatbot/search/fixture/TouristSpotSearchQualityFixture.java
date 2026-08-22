@@ -73,19 +73,26 @@ public final class TouristSpotSearchQualityFixture {
 
     public static List<SearchQualityCase> cases() {
         return List.of(
-                qualityCase("서울 야경 전망 명소", N_SEOUL_TOWER_ID),
-                qualityCase("제주 가족 체험 여행지", JEJU_FOLK_VILLAGE_ID),
-                qualityCase("비 오는 날 실내 미술관", SEOUL_MUSEUM_ID),
-                qualityCase("부산 해변 데이트 명소", HAEUNDAE_ID),
-                qualityCase("경복궁 입장료", GYEONGBOKGUNG_ID),
-                qualityCase("국립현대미술관 서울", SEOUL_MUSEUM_ID)
+                qualityCase("서울 야경 전망 명소", N_SEOUL_TOWER_ID, "서울", 12),
+                qualityCase("제주 가족 체험 여행지", JEJU_FOLK_VILLAGE_ID, "제주", 12),
+                qualityCase("비 오는 날 실내 미술관", SEOUL_MUSEUM_ID, "서울", 14),
+                qualityCase("부산 해변 데이트 명소", HAEUNDAE_ID, "부산", 12),
+                qualityCase("경복궁 입장료", GYEONGBOKGUNG_ID, "서울", 12),
+                qualityCase("국립현대미술관 서울", SEOUL_MUSEUM_ID, "서울", 14)
         );
     }
 
-    private static SearchQualityCase qualityCase(String question, long expectedTouristSpotId) {
+    private static SearchQualityCase qualityCase(
+            String question,
+            long expectedTouristSpotId,
+            String region,
+            int contentTypeId
+    ) {
         return new SearchQualityCase(
                 question,
                 expectedTouristSpotId,
+                region,
+                contentTypeId,
                 new TouristSpotSearchCriteria(
                         question, null, null, null, null, null, null, null, null,
                         null, null, null, 5, null
@@ -124,10 +131,4 @@ public final class TouristSpotSearchQualityFixture {
         );
     }
 
-    public record SearchQualityCase(
-            String question,
-            long expectedTouristSpotId,
-            TouristSpotSearchCriteria criteria
-    ) {
-    }
 }

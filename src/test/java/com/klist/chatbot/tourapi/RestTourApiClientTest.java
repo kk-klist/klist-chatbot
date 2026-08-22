@@ -148,8 +148,7 @@ class RestTourApiClientTest {
     @Test
     void emptyResponse() {
         server.expect(once(), requestTo(BASE_URL + "/detailCommon2?serviceKey=test-key&MobileOS=ETC"
-                        + "&MobileApp=test-app&_type=json&contentId=126480&defaultYN=Y&firstImageYN=Y"
-                        + "&areacodeYN=Y&catcodeYN=Y&addrinfoYN=Y&mapinfoYN=Y&overviewYN=Y"))
+                        + "&MobileApp=test-app&_type=json&contentId=126480"))
                 .andRespond(withSuccess("", MediaType.APPLICATION_JSON));
 
         var result = client.getDetailCommon("126480");

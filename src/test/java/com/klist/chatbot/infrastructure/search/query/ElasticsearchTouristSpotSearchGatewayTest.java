@@ -13,11 +13,14 @@ import com.klist.chatbot.infrastructure.search.document.TouristSpotSearchRegion;
 import com.klist.chatbot.infrastructure.search.index.TouristSpotIndexProperties;
 import com.klist.chatbot.search.application.TouristSpotSearchCriteria;
 import com.klist.chatbot.search.application.TouristSpotSearchResult;
+import java.net.ConnectException;
+import java.net.SocketTimeoutException;
 import java.time.Duration;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.core.io.ClassPathResource;
+import org.springframework.dao.TransientDataAccessResourceException;
 import org.springframework.data.elasticsearch.client.elc.NativeQuery;
 import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
 import org.springframework.data.elasticsearch.core.SearchHit;
@@ -62,6 +65,8 @@ class ElasticsearchTouristSpotSearchGatewayTest {
                 .contains("title.keyword");
         assertThat(query.getPageable().getPageSize()).isEqualTo(7);
         assertThat(query.getMinScore()).isEqualTo(1.5f);
+        assertThat(query.getSourceFilter()).isNotNull();
+        assertThat(query.getSourceFilter().getExcludes()).containsExactly("sourceModifiedAt");
     }
 
     @Test
@@ -105,7 +110,58 @@ class ElasticsearchTouristSpotSearchGatewayTest {
 
         assertThatThrownBy(() -> gateway.search(criteria()))
                 .isInstanceOf(TouristSpotSearchException.class)
-                .hasCause(cause);
+                .hasCause(cause)
+                .satisfies(exception -> assertThat(
+                        ((TouristSpotSearchException) exception).retryable()
+                ).isFalse());
+    }
+
+    @Test
+    void marksTransientElasticsearchFailureAsRetryable() {
+        RuntimeException cause = new TransientDataAccessResourceException("unavailable");
+        when(operations.search(
+                org.mockito.ArgumentMatchers.any(NativeQuery.class),
+                eq(TouristSpotSearchDocument.class),
+                eq(IndexCoordinates.of("tourist-spots"))
+        )).thenThrow(cause);
+
+        assertThatThrownBy(() -> gateway.search(criteria()))
+                .isInstanceOfSatisfying(TouristSpotSearchException.class, exception ->
+                        assertThat(exception.retryable()).isTrue());
+    }
+
+    @Test
+    void marksNestedConnectionFailureAsRetryable() {
+        RuntimeException cause = new RuntimeException(
+                "wrapped connection failure",
+                new ConnectException("connection refused")
+        );
+        when(operations.search(
+                org.mockito.ArgumentMatchers.any(NativeQuery.class),
+                eq(TouristSpotSearchDocument.class),
+                eq(IndexCoordinates.of("tourist-spots"))
+        )).thenThrow(cause);
+
+        assertThatThrownBy(() -> gateway.search(criteria()))
+                .isInstanceOfSatisfying(TouristSpotSearchException.class, exception ->
+                        assertThat(exception.retryable()).isTrue());
+    }
+
+    @Test
+    void marksNestedTimeoutFailureAsRetryable() {
+        RuntimeException cause = new RuntimeException(
+                "wrapped timeout failure",
+                new SocketTimeoutException("read timed out")
+        );
+        when(operations.search(
+                org.mockito.ArgumentMatchers.any(NativeQuery.class),
+                eq(TouristSpotSearchDocument.class),
+                eq(IndexCoordinates.of("tourist-spots"))
+        )).thenThrow(cause);
+
+        assertThatThrownBy(() -> gateway.search(criteria()))
+                .isInstanceOfSatisfying(TouristSpotSearchException.class, exception ->
+                        assertThat(exception.retryable()).isTrue());
     }
 
     private static TouristSpotSearchCriteria criteria() {

@@ -12,6 +12,9 @@ import com.klist.chatbot.search.application.TouristSpotSearchGateway;
 import com.klist.chatbot.search.application.TouristSpotSearchResult;
 import java.util.ArrayList;
 import java.util.List;
+import java.net.ConnectException;
+import java.net.SocketTimeoutException;
+import org.springframework.dao.TransientDataAccessException;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.elasticsearch.client.elc.NativeQuery;
 import org.springframework.data.elasticsearch.client.elc.NativeQueryBuilder;
@@ -20,6 +23,7 @@ import org.springframework.data.elasticsearch.core.SearchHit;
 import org.springframework.data.elasticsearch.core.SearchHits;
 import org.springframework.data.elasticsearch.core.geo.GeoPoint;
 import org.springframework.data.elasticsearch.core.mapping.IndexCoordinates;
+import org.springframework.data.elasticsearch.core.query.FetchSourceFilterBuilder;
 
 public class ElasticsearchTouristSpotSearchGateway implements TouristSpotSearchGateway {
 
@@ -61,8 +65,25 @@ public class ElasticsearchTouristSpotSearchGateway implements TouristSpotSearchG
                     hits.getExecutionDuration()
             );
         } catch (RuntimeException exception) {
-            throw new TouristSpotSearchException("Unable to search tourist spots.", exception);
+            throw new TouristSpotSearchException(
+                    "Unable to search tourist spots.",
+                    exception,
+                    isRetryable(exception)
+            );
         }
+    }
+
+    private static boolean isRetryable(Throwable failure) {
+        Throwable current = failure;
+        while (current != null) {
+            if (current instanceof TransientDataAccessException
+                    || current instanceof ConnectException
+                    || current instanceof SocketTimeoutException) {
+                return true;
+            }
+            current = current.getCause();
+        }
+        return false;
     }
 
     NativeQuery buildQuery(TouristSpotSearchCriteria criteria) {
@@ -81,6 +102,9 @@ public class ElasticsearchTouristSpotSearchGateway implements TouristSpotSearchG
         NativeQueryBuilder builder = NativeQuery.builder()
                 .withQuery(Query.of(query -> query.bool(bool.build())))
                 .withPageable(PageRequest.of(0, criteria.size()))
+                .withSourceFilter(new FetchSourceFilterBuilder()
+                        .withExcludes("sourceModifiedAt")
+                        .build())
                 .withTrackTotalHits(true);
         if (criteria.minimumScore() != null) {
             builder.withMinScore(criteria.minimumScore());

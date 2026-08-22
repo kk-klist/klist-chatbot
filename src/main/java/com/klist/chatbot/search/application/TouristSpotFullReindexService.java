@@ -6,6 +6,8 @@ import com.klist.chatbot.infrastructure.search.document.TouristSpotSearchDocumen
 import com.klist.chatbot.infrastructure.search.index.TouristSpotIndexManager;
 import com.klist.chatbot.infrastructure.search.index.TouristSpotIndexingGateway;
 import com.klist.chatbot.infrastructure.search.mapper.TouristSpotSearchDocumentMapper;
+import com.klist.chatbot.infrastructure.search.failure.TouristSpotIndexFailureOperation;
+import com.klist.chatbot.infrastructure.search.failure.TouristSpotIndexFailureRecorder;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -20,6 +22,7 @@ public class TouristSpotFullReindexService {
     private final TouristSpotIndexManager indexManager;
     private final TouristSpotReindexProperties properties;
     private final Clock clock;
+    private final TouristSpotIndexFailureRecorder failureRecorder;
 
     public TouristSpotFullReindexService(
             TouristSpotRepository repository,
@@ -29,12 +32,26 @@ public class TouristSpotFullReindexService {
             TouristSpotReindexProperties properties,
             Clock clock
     ) {
+        this(repository, mapper, indexingGateway, indexManager, properties, clock,
+                TouristSpotIndexFailureRecorder.NO_OP);
+    }
+
+    public TouristSpotFullReindexService(
+            TouristSpotRepository repository,
+            TouristSpotSearchDocumentMapper mapper,
+            TouristSpotIndexingGateway indexingGateway,
+            TouristSpotIndexManager indexManager,
+            TouristSpotReindexProperties properties,
+            Clock clock,
+            TouristSpotIndexFailureRecorder failureRecorder
+    ) {
         this.repository = repository;
         this.mapper = mapper;
         this.indexingGateway = indexingGateway;
         this.indexManager = indexManager;
         this.properties = properties;
         this.clock = clock;
+        this.failureRecorder = failureRecorder;
     }
 
     public TouristSpotReindexSummary reindexAll() {
@@ -58,6 +75,12 @@ public class TouristSpotFullReindexService {
                     documents.add(mapper.map(touristSpot));
                 } catch (RuntimeException exception) {
                     failedIds.add(touristSpot.getId());
+                    failureRecorder.record(
+                            touristSpot.getId(),
+                            TouristSpotIndexFailureOperation.FULL_REINDEX,
+                            indexName,
+                            exception
+                    );
                 }
             }
 
@@ -65,10 +88,21 @@ public class TouristSpotFullReindexService {
                 try {
                     indexingGateway.saveAll(documents, indexName);
                     successCount += documents.size();
+                    documents.forEach(document -> failureRecorder.resolve(
+                            document.touristSpotId(),
+                            TouristSpotIndexFailureOperation.FULL_REINDEX,
+                            indexName
+                    ));
                 } catch (RuntimeException exception) {
                     failedIds.addAll(documents.stream()
                             .map(TouristSpotSearchDocument::touristSpotId)
                             .toList());
+                    documents.forEach(document -> failureRecorder.record(
+                            document.touristSpotId(),
+                            TouristSpotIndexFailureOperation.FULL_REINDEX,
+                            indexName,
+                            exception
+                    ));
                 }
             }
         }

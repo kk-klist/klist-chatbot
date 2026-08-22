@@ -1,0 +1,69 @@
+[
+  {
+    "question": "서울에서 무료로 오전에 방문할 궁궐을 추천해줘",
+    "answer": "경복궁은 09:00부터 관람할 수 있고 입장료는 무료입니다. 문의는 02-3700-3900입니다.",
+    "recommendations": [{"touristSpotId": 1001, "reason": "09:00부터 운영하고 무료입니다."}],
+    "evidence": [{
+      "touristSpotId": 1001,
+      "title": "경복궁",
+      "phoneNumber": "02-3700-3900",
+      "openingHours": "09:00~18:00",
+      "admissionFee": "무료",
+      "reservationUrl": "https://example.com/gyeongbokgung"
+    }],
+    "expectedValid": true,
+    "expectedViolation": null
+  },
+  {
+    "question": "서울 궁궐을 추천해줘",
+    "answer": "검색 결과의 궁궐을 추천합니다.",
+    "recommendations": [{"touristSpotId": 9999, "reason": "대표 궁궐입니다."}],
+    "evidence": [{"touristSpotId": 1001, "title": "경복궁"}],
+    "expectedValid": false,
+    "expectedViolation": "UNSUPPORTED_TOURIST_SPOT"
+  },
+  {
+    "question": "예약할 수 있는 관광지를 알려줘",
+    "answer": "예약 주소는 https://invented.example/reserve 입니다.",
+    "recommendations": [{"touristSpotId": 1001, "reason": "사전 예약이 가능합니다."}],
+    "evidence": [{
+      "touristSpotId": 1001,
+      "title": "경복궁",
+      "reservationUrl": "https://example.com/gyeongbokgung"
+    }],
+    "expectedValid": false,
+    "expectedViolation": "UNSUPPORTED_URL"
+  },
+  {
+    "question": "늦게까지 여는 관광지를 알려줘",
+    "answer": "경복궁은 22:00까지 운영합니다.",
+    "recommendations": [{"touristSpotId": 1001, "reason": "야간 방문이 가능합니다."}],
+    "evidence": [{"touristSpotId": 1001, "title": "경복궁", "openingHours": "09:00~18:00"}],
+    "expectedValid": false,
+    "expectedViolation": "UNSUPPORTED_OPENING_HOURS"
+  },
+  {
+    "question": "입장료가 저렴한 관광지를 알려줘",
+    "answer": "입장료는 5,000원입니다.",
+    "recommendations": [{"touristSpotId": 1001, "reason": "비용 부담이 적습니다."}],
+    "evidence": [{"touristSpotId": 1001, "title": "경복궁", "admissionFee": "3,000원"}],
+    "expectedValid": false,
+    "expectedViolation": "UNSUPPORTED_ADMISSION_FEE"
+  },
+  {
+    "question": "관광지 문의 전화번호를 알려줘",
+    "answer": "문의 전화는 02-9999-9999입니다.",
+    "recommendations": [{"touristSpotId": 1001, "reason": "전화 문의가 가능합니다."}],
+    "evidence": [{"touristSpotId": 1001, "title": "경복궁", "phoneNumber": "02-3700-3900"}],
+    "expectedValid": false,
+    "expectedViolation": "UNSUPPORTED_PHONE_NUMBER"
+  },
+  {
+    "question": "부산에서 바다를 볼 수 있는 곳을 추천해줘",
+    "answer": "해운대해수욕장을 추천합니다.",
+    "recommendations": [{"touristSpotId": 2001, "reason": "바다 풍경을 볼 수 있습니다."}],
+    "evidence": [{"touristSpotId": 2001, "title": "해운대해수욕장"}],
+    "expectedValid": true,
+    "expectedViolation": null
+  }
+]

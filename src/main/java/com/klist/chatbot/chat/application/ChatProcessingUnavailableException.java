@@ -1,8 +1,16 @@
 package com.klist.chatbot.chat.application;
 
-public class ChatProcessingUnavailableException extends RuntimeException {
+import com.klist.chatbot.global.error.ChatbotErrorComponent;
+import com.klist.chatbot.global.error.ChatbotErrorType;
+import com.klist.chatbot.global.error.ChatbotException;
+
+public class ChatProcessingUnavailableException extends ChatbotException {
 
     public ChatProcessingUnavailableException(String message) {
-        super(message);
+        this(message, null);
+    }
+
+    public ChatProcessingUnavailableException(String message, Throwable cause) {
+        super(ChatbotErrorComponent.LLM, ChatbotErrorType.UNAVAILABLE, message, true, cause);
     }
 }

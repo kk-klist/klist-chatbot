@@ -15,10 +15,14 @@ paths:
       summary: 관광 챗봇 질의
       description: |
         검색과 LLM 처리를 수행하고 근거 관광지와 함께 답변을 반환한다.
-        timeoutMs는 Chatbot 내부 처리 시간 예산이며 기본값은 5000ms다.
+        requestId는 UUID이며 같은 요청의 HTTP 재시도에서 동일하게 유지한다.
+        완료 응답은 5분간 재사용하고 처리 중 동일 요청은 409를 반환한다.
+        context는 Backend가 관리하는 임시 세션의 최근 메시지를 오래된 순서로 최대 10개 전달한다.
+        timeoutMs는 Chatbot 내부 처리 시간 예산이며 기본값은 30000ms다.
         Backend HTTP Client timeout은 네트워크 여유를 포함해 이 값보다 길게 설정한다.
       parameters:
         - $ref: '#/components/parameters/TraceId'
+        - $ref: '#/components/parameters/InternalApiKey'
       requestBody:
         required: true
         content:
@@ -26,9 +30,11 @@ paths:
             schema:
               $ref: '#/components/schemas/ChatQueryRequest'
             example:
+              requestId: a22c717d-5a3e-46b5-92fc-f41624b85887
               sessionId: session-20260727-001
               userId: user-1004
               message: 서울에서 아이와 방문할 실내 관광지를 추천해줘
+              context: []
               timeoutMs: 5000
       responses:
         '200':
@@ -49,6 +55,28 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: 내부 API 키가 누락되었거나 올바르지 않음
+          headers:
+            X-Trace-Id:
+              $ref: '#/components/headers/TraceId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: 동일 요청이 처리 중이거나 requestId가 다른 내용에 재사용됨
+          headers:
+            X-Trace-Id:
+              $ref: '#/components/headers/TraceId'
+            Retry-After:
+              description: 처리 중인 동일 요청의 권장 재시도 대기 시간(초)
+              schema:
+                type: integer
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '504':
           description: 검색 또는 LLM 처리가 제한 시간을 초과함
           headers:
@@ -59,7 +87,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
         '503':
-          description: 검색 및 LLM 처리 구현이 준비되지 않았거나 일시적으로 사용 불가함
+          description: 내부 인증 설정, 검색 또는 LLM 처리가 일시적으로 사용 불가함
           headers:
             X-Trace-Id:
               $ref: '#/components/headers/TraceId'
@@ -76,8 +104,84 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+  /internal/chat/query/audio:
+    post:
+      operationId: queryChatbotWithAudio
+      summary: 음성 관광 챗봇 질의
+      description: |
+        음성을 텍스트로 변환한 뒤 기존 JSON Chat 질문 처리 흐름에 전달한다.
+        음성 원본은 저장하지 않는다. 지원 형식은 mp3, mp4, mpeg, mpga, m4a, wav, webm이며
+        최대 크기는 25MB다.
+      parameters:
+        - $ref: '#/components/parameters/TraceId'
+        - $ref: '#/components/parameters/InternalApiKey'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - request
+                - audio
+              properties:
+                request:
+                  $ref: '#/components/schemas/AudioChatQueryRequest'
+                audio:
+                  type: string
+                  format: binary
+      responses:
+        '200':
+          description: 음성 변환 및 질의 처리 완료
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatQueryResponse'
+        '400':
+          description: 요청 또는 음성 형식 검증 실패
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: 내부 API 인증 실패
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '413':
+          description: 음성 파일 크기 초과
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: 변환된 음성 텍스트가 비어 있음
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: STT Provider 또는 Chat 처리가 일시적으로 사용 불가함
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '504':
+          description: STT 또는 Chat 처리가 제한 시간을 초과함
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 components:
   parameters:
+    InternalApiKey:
+      name: X-Internal-Api-Key
+      in: header
+      required: true
+      description: Backend와 Chatbot이 공유하는 내부 API 인증 키
+      schema:
+        type: string
     TraceId:
       name: X-Trace-Id
       in: header
@@ -97,9 +201,12 @@ components:
       type: object
       required:
         - sessionId
-        - userId
         - message
       properties:
+        requestId:
+          type: string
+          format: uuid
+          description: 생략하면 서버에서 생성합니다.
         sessionId:
           type: string
           minLength: 1
@@ -108,30 +215,76 @@ components:
           type: string
           minLength: 1
           maxLength: 100
+          description: 생략하면 sessionId를 익명 사용자 식별자로 사용합니다.
         message:
           type: string
           minLength: 1
           maxLength: 4000
+        context:
+          type: array
+          maxItems: 10
+          default: []
+          items:
+            $ref: '#/components/schemas/ChatContextMessage'
         timeoutMs:
           type: integer
           minimum: 100
           maximum: 30000
-          default: 5000
+          default: 30000
+    AudioChatQueryRequest:
+      type: object
+      required:
+        - requestId
+        - sessionId
+        - userId
+      properties:
+        requestId:
+          type: string
+          format: uuid
+        sessionId:
+          type: string
+          minLength: 1
+          maxLength: 100
+        userId:
+          type: string
+          minLength: 1
+          maxLength: 100
+        context:
+          type: array
+          maxItems: 10
+          default: []
+          items:
+            $ref: '#/components/schemas/ChatContextMessage'
+        timeoutMs:
+          type: integer
+          minimum: 100
+          maximum: 30000
+          default: 30000
     ChatQueryResponse:
       type: object
       required:
+        - requestId
         - answer
         - sources
+        - suggestions
         - traceId
         - status
         - processingTimeMs
       properties:
+        requestId:
+          type: string
+          format: uuid
         answer:
           type: string
         sources:
           type: array
           items:
             $ref: '#/components/schemas/ChatSource'
+        suggestions:
+          type: array
+          description: 현재 상태에서 사용자가 이어서 질문할 수 있는 예시입니다.
+          items:
+            type: string
         traceId:
           type: string
         status:
@@ -140,6 +293,21 @@ components:
           type: integer
           format: int64
           minimum: 0
+    ChatContextMessage:
+      type: object
+      required:
+        - role
+        - content
+      properties:
+        role:
+          type: string
+          enum:
+            - USER
+            - ASSISTANT
+        content:
+          type: string
+          minLength: 1
+          maxLength: 4000
     ChatSource:
       type: object
       required:
@@ -171,6 +339,8 @@ components:
       enum:
         - COMPLETED
         - NO_RESULT
+        - UNSUPPORTED
+        - CLARIFICATION_REQUIRED
     ErrorResponse:
       type: object
       required:
@@ -183,10 +353,19 @@ components:
         code:
           type: string
           enum:
+            - UNAUTHORIZED
+            - INTERNAL_AUTH_NOT_CONFIGURED
+            - REQUEST_IN_PROGRESS
+            - REQUEST_ID_CONFLICT
             - INVALID_REQUEST
             - CHAT_QUERY_TIMEOUT
             - CHAT_PROCESSING_UNAVAILABLE
             - CHAT_PROCESSING_FAILED
+            - STT_INVALID_FILE
+            - STT_FILE_TOO_LARGE
+            - STT_TIMEOUT
+            - STT_EMPTY_RESULT
+            - STT_UNAVAILABLE
             - INTERNAL_ERROR
         message:
           type: string

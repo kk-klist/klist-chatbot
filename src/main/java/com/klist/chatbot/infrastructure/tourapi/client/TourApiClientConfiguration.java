@@ -1,6 +1,7 @@
 package com.klist.chatbot.infrastructure.tourapi.client;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.klist.chatbot.observability.RetryEventListener;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -12,7 +13,10 @@ import org.springframework.web.client.RestClient;
 public class TourApiClientConfiguration {
 
     @Bean
-    TourApiClient tourApiClient(TourApiProperties properties) {
+    TourApiClient tourApiClient(
+            TourApiProperties properties,
+            RetryEventListener retryEvents
+    ) {
         SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
         requestFactory.setConnectTimeout(properties.getConnectTimeout());
         requestFactory.setReadTimeout(properties.getResponseTimeout());
@@ -20,6 +24,14 @@ public class TourApiClientConfiguration {
         RestClient restClient = RestClient.builder()
                 .requestFactory(requestFactory)
                 .build();
-        return new RestTourApiClient(restClient, new ObjectMapper(), properties);
+        TourApiClient client = new RestTourApiClient(restClient, new ObjectMapper(), properties);
+        return new RetryingRateLimitedTourApiClient(
+                client,
+                properties.getRequestInterval(),
+                properties.getRetryMaxAttempts(),
+                properties.getRetryInitialBackoff(),
+                properties.getRetryMaxBackoff(),
+                retryEvents
+        );
     }
 }
