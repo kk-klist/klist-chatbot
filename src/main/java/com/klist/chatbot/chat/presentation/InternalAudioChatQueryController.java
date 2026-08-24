@@ -2,6 +2,7 @@ package com.klist.chatbot.chat.presentation;
 
 import com.klist.chatbot.chat.application.InternalChatQueryUseCase;
 import com.klist.chatbot.chat.presentation.dto.InternalAudioChatQueryRequest;
+import com.klist.chatbot.chat.presentation.dto.InternalAudioChatQueryResponse;
 import com.klist.chatbot.chat.presentation.dto.InternalChatQueryResponse;
 import com.klist.chatbot.speech.application.SpeechAudio;
 import com.klist.chatbot.speech.application.SpeechToTextException;
@@ -34,7 +35,7 @@ public class InternalAudioChatQueryController {
     }
 
     @PostMapping(value = "/query/audio", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ResponseEntity<InternalChatQueryResponse> query(
+    public ResponseEntity<InternalAudioChatQueryResponse> query(
             @Valid @RequestPart("request") InternalAudioChatQueryRequest request,
             @RequestPart("audio") MultipartFile audio,
             HttpServletRequest servletRequest
@@ -47,7 +48,7 @@ public class InternalAudioChatQueryController {
         );
         return ResponseEntity.ok()
                 .header(TraceIdResolver.HEADER_NAME, traceId)
-                .body(response);
+                .body(InternalAudioChatQueryResponse.from(transcription, response));
     }
 
     private SpeechAudio toSpeechAudio(MultipartFile file) {

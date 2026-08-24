@@ -136,7 +136,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ChatQueryResponse'
+                $ref: '#/components/schemas/AudioChatQueryResponse'
         '400':
           description: 요청 또는 음성 형식 검증 실패
           content:
@@ -293,6 +293,17 @@ components:
           type: integer
           format: int64
           minimum: 0
+    AudioChatQueryResponse:
+      allOf:
+        - $ref: '#/components/schemas/ChatQueryResponse'
+        - type: object
+          required:
+            - transcription
+          properties:
+            transcription:
+              type: string
+              minLength: 1
+              description: STT 후 실제 챗봇 질의의 message로 전달한 최종 정제 텍스트입니다.
     ChatContextMessage:
       type: object
       required:

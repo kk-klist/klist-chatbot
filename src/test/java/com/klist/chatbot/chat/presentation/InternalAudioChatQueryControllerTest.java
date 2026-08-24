@@ -71,9 +71,14 @@ class InternalAudioChatQueryControllerTest {
                         .header(InternalApiKeyAuthenticationFilter.HEADER_NAME, INTERNAL_API_KEY))
                 .andExpect(status().isOk())
                 .andExpect(header().string("X-Trace-Id", TRACE_ID))
+                .andExpect(jsonPath("$.requestId").value(REQUEST_ID.toString()))
+                .andExpect(jsonPath("$.transcription").value("서울 관광지를 추천해줘"))
                 .andExpect(jsonPath("$.status").value("COMPLETED"))
                 .andExpect(jsonPath("$.answer").value("경복궁을 추천합니다."))
-                .andExpect(jsonPath("$.suggestions[0]").value("부산 관광지도 알려줘"));
+                .andExpect(jsonPath("$.sources").isArray())
+                .andExpect(jsonPath("$.suggestions[0]").value("부산 관광지도 알려줘"))
+                .andExpect(jsonPath("$.traceId").value(TRACE_ID))
+                .andExpect(jsonPath("$.processingTimeMs").value(120));
 
         ArgumentCaptor<SpeechAudio> audioCaptor = ArgumentCaptor.forClass(SpeechAudio.class);
         verify(transcriptionService).transcribe(audioCaptor.capture());
