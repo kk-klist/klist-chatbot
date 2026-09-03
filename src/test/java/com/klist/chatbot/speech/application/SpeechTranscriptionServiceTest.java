@@ -38,6 +38,13 @@ class SpeechTranscriptionServiceTest {
     }
 
     @Test
+    void normalizesParameterizedWebmContentType() {
+        SpeechAudio audio = audio("voice.webm", " Audio/WebM ; codecs=opus ", new byte[]{1});
+
+        assertThat(audio.contentType()).isEqualTo("audio/webm");
+    }
+
+    @Test
     void rejectsEmptyUnsupportedAndOversizedFiles() {
         assertFailure(audio("voice.wav", "audio/wav", new byte[0]),
                 SpeechToTextFailureType.INVALID_FILE);
@@ -74,7 +81,9 @@ class SpeechTranscriptionServiceTest {
                 Arguments.of("voice.mpga", "audio/mpeg"),
                 Arguments.of("voice.m4a", "audio/x-m4a"),
                 Arguments.of("voice.wav", "audio/wav"),
-                Arguments.of("voice.webm", "audio/webm")
+                Arguments.of("voice.webm", "audio/webm"),
+                Arguments.of("voice.webm", "audio/webm;codecs=opus"),
+                Arguments.of("voice.webm", " Audio/WebM ; codecs=opus ")
         );
     }
 
